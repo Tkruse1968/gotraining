@@ -68,10 +68,41 @@ func main() {
     }
 }
 
-func copyToCustomProperties(repo, topic string) {
-    // Add your logic here to copy the topic to custom properties in GitHub Enterprise
-    // This function will be triggered by an event of adding a new topic to a GitHub Enterprise repository
-    // You can use the GitHub Enterprise API to update the custom properties
-    // Make sure to handle any errors and log them if necessary
+func copyTopicToCustomProperties(owner, repo, newTopic string) error {
+    ctx := context.Background()
+    token := os.Getenv("GITHUB_TOKEN")
+    if token == "" {
+        return fmt.Errorf("GITHUB_TOKEN environment variable not set")
+    }
+
+    ts := oauth2.StaticTokenSource(
+        &oauth2.Token{AccessToken: token},
+    )
+    tc := oauth2.NewClient(ctx, ts)
+    client := github.NewClient(tc)
+
+    // Fetch current topics
+    topics, _, err := client.Repositories.ListAllTopics(ctx, owner, repo)
+    if err != nil {
+        return fmt.Errorf("error fetching topics: %v", err)
+    }
+
+    // Add new topic to custom properties (assuming custom properties are stored in a specific format)
+    customProperties := map[string]string{
+        "custom_topic": newTopic,
+    }
+
+    // Update repository with new custom properties
+    repoRequest := &github.Repository{
+        Topics: append(topics, newTopic),
+    }
+    _, _, err = client.Repositories.Edit(ctx, owner, repo, repoRequest)
+    if err != nil {
+        return fmt.Errorf("error updating repository: %v", err)
+    }
+
+    log.Printf("Successfully copied topic '%s' to custom properties", newTopic)
+    return nil
+}
     fmt.Printf("Copying topic to custom properties for repository %s: %s\n", repo, topic)
 }
